@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What If a Black Hole Swallowed Earth?</title>
+  <link rel="stylesheet" href="style.css" />
+  <script type="module" src="main.js"></script>
+</head>
+<body>
+  <div id="viewport"></div>
+  <div id="timeline">
+    <input type="range" id="time-slider" min="0" max="100" value="0" />
+    <div id="timeline-labels">
+      <span id="label-normal">NORMAL</span>
+      <span id="label-1s">1 SEC</span>
+      <span id="label-10s">10 SEC</span>
+      <span id="label-1m">1 MIN</span>
+      <span id="label-1h">1 HOUR</span>
+      <span id="label-1d">1 DAY</span>
+      <span id="label-final">FINAL</span>
+    </div>
+  </div>
+  <div id="ai-chat">
+    <div id="chat-log"></div>
+    <input type="text" id="chat-input" placeholder="Ask a question…" />
+    <button id="chat-send">Send</button>
+  </div>
+  <div id="simulation-mode">
+    <p>SIMULATION MODE: This is an educational visualization. Timescales and effects are simplified.</p>
+  </div>
+</body>
+</html>
