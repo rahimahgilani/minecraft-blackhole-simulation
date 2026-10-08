@@ -75,7 +75,7 @@ w4.update(0.1, 0.016, 1, bhPos);
 assert.strictEqual(w4.moonSphere.visible, true, 'moon intact early');
 assert.strictEqual(w4.moonCracks[0].material.opacity < 0.1, true, 'moon cracks dark early');
 w4.update(0.35, 0.016, 1, bhPos);
-assert.ok(w4.moonCracks[0].material.opacity > 0.1, 'moon cracks glowing at t=0.35');
+assert.ok(w4.moonCracks.some((mc) => mc.material.opacity > 0.1), 'moon cracks glowing at t=0.35 (pulsing, so check any)');
 w4.update(0.5, 0.016, 1, bhPos);
 assert.strictEqual(w4.moonSphere.visible, false, 'moon shattered by t=0.5');
 assert.ok(w4.moonChunks.some((c) => c.visible), 'moon chunks drifting apart');
@@ -99,31 +99,61 @@ w6.update(0.7, 0.016, 1, bhPos);
 assert.strictEqual(w6.magmaMesh.visible, true, 'magma fountains active in late phase');
 ok('magma eruptions fire from the fissures');
 
-// --- spaghettification stretch ---
+// --- spaghettification stretch (along the PULL axis: local Z after lookAt) ---
 const w7 = createWorld(scene);
 w7.update(0.2, 0.016, 1, bhPos);
-assert.strictEqual(w7.peds[0].scale.y, 1, 'people unstretched early');
-assert.strictEqual(w7.cars[0].scale.y, 1, 'cars unstretched early');
+assert.strictEqual(w7.peds[0].scale.z, 1, 'people unstretched early');
+assert.strictEqual(w7.cars[0].scale.z, 1, 'cars unstretched early');
 w7.update(0.9, 0.016, 1, bhPos);
-assert.ok(w7.peds[0].scale.y > 1.05, 'people stretched toward BH late');
-assert.ok(w7.cars[0].scale.y > 1.05, 'cars stretched toward BH late');
-ok('spaghettification: people and cars stretch in late phases, normal early');
+assert.ok(w7.peds[0].scale.z > 1.05, 'people stretched along pull axis late');
+assert.ok(w7.cars[0].scale.z > 1.05, 'cars stretched along pull axis late');
+assert.ok(w7.peds[0].scale.x < 1, 'people thin across as they stretch');
+ok('spaghettification: stretch along pull axis (Z), thinning across, normal early');
+
+// --- beading: body parts separate into droplets along the pull line ---
+const w8 = createWorld(scene);
+w8.update(0.2, 0.016, 1, bhPos);
+const earlyGap = Math.abs(w8.peds[0].children[0].position.z - w8.peds[0].children[1].position.z);
+w8.update(0.9, 0.016, 1, bhPos);
+const lateGap = Math.abs(w8.peds[0].children[0].position.z - w8.peds[0].children[1].position.z);
+assert.ok(lateGap > earlyGap, 'body parts separate as stretch grows (beading)');
+ok('beading: body parts separate into droplets along the pull line');
+
+// --- late-phase infall + consumption (BH has descended near the city by now) ---
+const bhEnd = new THREE.Vector3(0, 40, 90); // BH_END from main.js at approach=1
+const w9 = createWorld(scene);
+for (let i = 0; i < 120; i++) w9.update(0.95, 0.016, i * 0.016, bhEnd);
+assert.ok(w9.cars.some((c) => !c.visible) || w9.peds.some((p) => !p.visible), 'objects consumed when they reach the BH');
+ok('late-phase infall: objects accelerate to the BH and are consumed');
 
 // --- final fragmentation: earth chunks spawn and fly (seeded random) ---
-const w8 = createWorld(scene);
+const w10 = createWorld(scene);
 const realRandom = Math.random;
 Math.random = () => 0.01; // force chunk spawns + deterministic behavior
-for (let i = 0; i < 80; i++) w8.update(0.95, 0.016, i * 0.016, bhPos);
+for (let i = 0; i < 80; i++) w10.update(0.95, 0.016, i * 0.016, bhPos);
 Math.random = realRandom;
-assert.ok(w8.chunks.some((c) => c.visible), 'earth chunks tear free in final phase');
-const flying = w8.chunks.find((c) => c.visible);
+assert.ok(w10.chunks.some((c) => c.visible), 'earth chunks tear free in final phase');
+const flying = w10.chunks.find((c) => c.visible);
 assert.ok(flying.position.y > 0 || flying.position.length() > 0, 'chunk is airborne/moving');
 ok('final fragmentation: earth chunks spawn and spiral toward the black hole');
 
+// --- END STATE: at t=1 Earth is fully consumed, only the debris ribbon remains ---
+const w11 = createWorld(scene);
+for (let i = 0; i < 60; i++) w11.update(i / 60, 0.016, i * 0.016, bhPos);
+w11.update(1, 0.016, 1, bhPos);
+assert.strictEqual(w11.group.children.some((ch) => ch === w11.ocean && ch.visible), false, 'ocean gone');
+assert.strictEqual(w11.moon.visible, false, 'moon gone');
+assert.strictEqual(w11.spout.visible, false, 'spout gone');
+assert.strictEqual(w11.atmoMesh.visible, false, 'atmosphere gone');
+assert.strictEqual(w11.magmaMesh.visible, false, 'magma gone');
+assert.strictEqual(w11.cracks.every((c) => !c.visible), true, 'cracks faded');
+assert.ok(w11.buildings.every((b) => !b.g.visible), 'buildings consumed');
+ok('END STATE: at t=1 Earth is fully consumed (ocean, moon, spout, atmo, magma, cracks, buildings all gone)');
+
 // --- debris system + spiral streams ---
-const w9 = createWorld(scene);
-w9.spawnDebris({ x: 0, y: 0, z: 0 }, 1);
-w9.update(0.9, 0.016, 1, bhPos);
+const w12 = createWorld(scene);
+w12.spawnDebris({ x: 0, y: 0, z: 0 }, 1);
+w12.update(0.9, 0.016, 1, bhPos);
 ok('spawnDebris + spiral debris physics update without throwing');
 
 console.log('\nALL ' + passed + ' SMOKE TEST GROUPS PASSED');

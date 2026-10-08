@@ -18,13 +18,9 @@ const milestonesRow = $('milestones');
 const btnPlay = $('btn-play');
 const btnRestart = $('btn-restart');
 const btnCinematic = $('btn-cinematic');
-const btnOrbit = $('btn-orbit');
 const btnControls = $('btn-controls');
 const controlsPanel = $('controls-panel');
-const chatLog = $('chat-log');
-const chatInput = $('chat-input');
-const chatSend = $('chat-send');
-const chatMin = $('chat-min');
+const eduWatch = $('edu-watch');
 const loading = $('loading');
 const lockHint = $('lock-hint');
 const timelineEl = $('timeline');
@@ -35,6 +31,13 @@ pauseVeil.id = 'pause-veil';
 pauseVeil.className = 'hidden';
 pauseVeil.textContent = 'PAUSED';
 document.body.appendChild(pauseVeil);
+
+// end veil (shown when Earth is fully consumed)
+const endVeil = document.createElement('div');
+endVeil.id = 'end-veil';
+endVeil.className = 'hidden';
+endVeil.innerHTML = '<b>EARTH IS GONE</b><span>Every fragment has crossed the event horizon.<br/>Press R to restart, or drag the timeline back.</span>';
+document.body.appendChild(endVeil);
 
 // ---------- renderer / scene ----------
 const scene = new THREE.Scene();
@@ -66,16 +69,18 @@ const MILESTONES = [
   { t: 0.45, label: '1 DAY' },
   { t: 0.70, label: '1 WEEK' },
   { t: 0.85, label: '2 WEEKS' },
-  { t: 1.00, label: '3 WEEKS FINAL' },
+  { t: 0.93, label: '4 WEEKS' },
+  { t: 1.00, label: '6 WEEKS FINAL' },
 ];
 const PHASES = [
-  { until: 0.05, title: 'NORMAL', text: 'Everything is normal. Earth is in its usual gravitational environment.', real: 'With no black hole nearby, only Earth\u2019s own gravity acts on you.' },
-  { until: 0.10, title: '1 SEC', text: 'The black hole has appeared. The first visible effect is the distortion of light around it.', real: 'Lensing would be the first sign \u2014 light bending around the object.' },
-  { until: 0.25, title: '1 MIN', text: 'Lensing strengthens. Glowing cracks spread across the Moon\u2019s face.', real: 'Tidal forces scale as 1/r\u00b3 \u2014 the smaller, lighter Moon fails first.' },
-  { until: 0.45, title: '1 HOUR', text: 'The atmosphere itself begins to stream away toward the black hole.', real: 'Atmospheric stripping: gases escape when the BH\u2019s pull beats Earth\u2019s gravity.' },
-  { until: 0.70, title: '1 DAY', text: 'The Moon shatters. The ocean draws back from the coast, then a tsunami crest rolls in.', real: 'Tidal disruption of the planet begins; the ocean responds first.' },
-  { until: 0.85, title: '1 WEEK', text: 'Magma fountains from the fissures and a spout stretches the sea into the sky.', real: 'Matter spirals inward, heating up as it feeds the accretion disk.' },
-  { until: 1.01, title: '2-3 WEEKS / FINAL', text: 'Earth is a glowing spiral of debris feeding the disk. Nothing escapes.', real: 'Fragmentation \u2192 accretion: the planet\u2019s mass joins the disk and horizon.' },
+  { until: 0.05, title: 'NORMAL', text: 'A bright Lahore morning. Traffic flows, pedestrians wander, the Moon hangs quietly in the sky. The only gravity that matters is Earth\u2019s own.', real: 'With no black hole nearby, only Earth\u2019s own gravity acts on you.', watch: 'Watch the traffic and the pedestrians \u2014 remember this. It\u2019s the last normal day.' },
+  { until: 0.10, title: '1 SEC', text: 'A black hole has torn into the sky above the city. Light bends around it, warping the stars behind it into rings.', real: 'Lensing: gravity bends light passing near the horizon, shifting apparent star positions.', watch: 'Watch the star field warp around the dark disk \u2014 the sky is no longer honest.' },
+  { until: 0.25, title: '1 MIN', text: 'The Moon\u2019s face splits with glowing cracks. Its near side is pulled harder than its far side, and the rock is starting to fail.', real: 'Tidal force scales as 1/r\u00b3 \u2014 the lighter Moon fails long before Earth does.', watch: 'Watch the Moon \u2014 it is the rehearsal for what happens to Earth.' },
+  { until: 0.45, title: '1 HOUR', text: 'The sky itself is leaving. Blue-white wisps of atmosphere stream off the horizon toward the black hole, and the blue begins to thin.', real: 'Atmospheric stripping: gases escape when the BH\u2019s pull beats Earth\u2019s gravity.', watch: 'Watch the horizon \u2014 the air is visibly flowing away, and it will not come back.' },
+  { until: 0.70, title: '1 DAY', text: 'The Moon shatters into drifting rubble. The ocean draws back from the coast, exposing the seabed \u2014 then a tsunami crest rolls through the city.', real: 'Tidal disruption begins; the ocean responds first, the crust follows.', watch: 'Watch the seabed appear, then the wall of water. It is faster than you.' },
+  { until: 0.85, title: '1 WEEK', text: 'The crust fails. Magma fountains from widening fissures, and the ocean itself is stretched into a spout reaching for the black hole.', real: 'Matter spirals inward, heating by compression as it feeds the accretion disk.', watch: 'Watch the fissures widen and glow \u2014 the ground is opening under the city.' },
+  { until: 0.93, title: '2 WEEKS', text: 'The city comes apart in earnest. Buildings tear loose and stream upward, stretching into glowing filaments as they rise.', real: 'Spaghettification: the near side is pulled so much harder that objects are drawn into filaments.', watch: 'Watch a building stretch as it rises \u2014 the pull is stronger on its top than its base.' },
+  { until: 1.01, title: '4-6 WEEKS / FINAL', text: 'The last fragments of Earth stretch, glow, and cross the horizon. The city, the ocean, the sky \u2014 all of it is now part of the disk.', real: 'Fragmentation \u2192 accretion: the planet\u2019s mass joins the disk and the horizon. Nothing escapes.', watch: 'Watch the last chunk stretch and fade into the disk. Then it is over \u2014 Earth is gone.' },
 ];
 function phaseFor(t) {
   for (const p of PHASES) if (t < p.until) return p;
@@ -90,7 +95,9 @@ const CLOCK_STOPS = [
   [0.25, 3600],        // 1 hour
   [0.45, 86400],       // 1 day
   [0.70, 604800],      // 1 week
-  [1.00, 1814400],     // 3 weeks
+  [0.85, 1209600],     // 2 weeks
+  [0.93, 2419200],     // 4 weeks
+  [1.00, 3628800],     // 6 weeks
 ];
 function simSeconds(t) {
   for (let i = 1; i < CLOCK_STOPS.length; i++) {
@@ -118,7 +125,6 @@ function formatClock(s) {
 let simTime = 0;
 let playing = true;
 let cinematic = false;
-let orbitView = false;
 let paused = false;
 let elapsed = 0;
 let dtLast = 0.016;
@@ -149,7 +155,12 @@ function setSimTime(t) {
   eduTitle.textContent = ph.title;
   eduText.textContent = ph.text;
   eduReal.textContent = 'Physically: ' + ph.real;
+  eduWatch.textContent = 'WATCH FOR: ' + ph.watch;
   simClock.textContent = formatClock(simSeconds(simTime));
+  // the sim ends only when Earth is fully consumed (t = 1)
+  const ended = simTime >= 1;
+  endVeil.classList.toggle('hidden', !ended);
+  if (ended) playing = false;
   let active = MILESTONES[0];
   for (const m of MILESTONES) if (simTime >= m.t - 0.001) active = m;
   labelsRow.querySelectorAll('span').forEach((el, i) => el.classList.toggle('active', MILESTONES[i] === active));
@@ -181,14 +192,9 @@ btnCinematic.addEventListener('click', () => {
   btnCinematic.textContent = cinematic ? '\ud83c\udfac CINEMATIC: ON' : '\ud83c\udfac CINEMATIC: OFF';
   if (cinematic) { cineClock = 0; controls.unlock(); }
 });
-btnOrbit.addEventListener('click', () => {
-  orbitView = !orbitView;
-  btnOrbit.textContent = orbitView ? '\ud83c\udf0d STREET VIEW' : '\ud83c\udf0d ORBIT VIEW';
-  if (orbitView) controls.unlock();
-});
 btnControls.addEventListener('click', () => controlsPanel.classList.toggle('hidden'));
 const btnSpeed = $('btn-speed');
-const SPEEDS = [1, 60, 3600];
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 btnSpeed.addEventListener('click', () => {
   speedMult = SPEEDS[(SPEEDS.indexOf(speedMult) + 1) % SPEEDS.length];
   btnSpeed.textContent = '\u23E9 SPEED \u00D7' + speedMult;
@@ -204,11 +210,10 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyR') btnRestart.click();
   if (e.code === 'KeyT') timelineEl.classList.toggle('hidden');
   if (e.code === 'KeyC') btnCinematic.click();
-  if (e.code === 'KeyV') btnOrbit.click();
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 renderer.domElement.addEventListener('click', () => {
-  if (!orbitView && !cinematic && !paused) controls.lock();
+  if (!cinematic && !paused) controls.lock();
 });
 controls.addEventListener('lock', () => lockHint.classList.add('hidden'));
 controls.addEventListener('unlock', () => lockHint.classList.remove('hidden'));
@@ -221,7 +226,7 @@ const GRAV = 22;
 const EYE = 1.7;
 
 function movePlayer(dt) {
-  if (controls.isLocked && !orbitView && !cinematic) {
+  if (controls.isLocked && !cinematic) {
     const speed = (keys['ShiftLeft'] ? 14 : 7) * (fly ? 2.2 : 1);
     dir.set(0, 0, 0);
     if (keys['KeyW']) dir.z -= 1;
@@ -272,41 +277,6 @@ function updateCinematic(dt) {
   if (simTime >= 1) btnCinematic.click();
 }
 
-// ---------- AI panel (offline, context-aware) ----------
-const KB = [
-  { q: /lens|light bend|distort/i, a: 'Gravitational lensing: the black hole\u2019s gravity bends light passing near it, so background stars appear shifted, stretched, or ringed. Watch the star field warp around the dark disk in the sim.' },
-  { q: /accretion|disk/i, a: 'The accretion disk is matter spiraling inward, heated to millions of degrees by friction and compression \u2014 brighter than stars. The sim shows a temperature gradient: white-hot inner edge, cooler orange outer edge.' },
-  { q: /event horizon|black sphere|dark center/i, a: 'The event horizon is the boundary where escape velocity exceeds light-speed. It looks pure black because no light escapes. Its radius (Schwarzschild radius) is ~3 km per solar mass.' },
-  { q: /tidal|spaghet|stretch/i, a: 'Tidal forces stretch objects radially because gravity is stronger on the near side than the far side. The gradient scales as 1/r\u00b3 \u2014 halve the distance and tidal stress grows ~8\u00d7.' },
-  { q: /sky|atmosphere|cloud/i, a: 'As the black hole approaches, its pull exceeds Earth\u2019s hold on the atmosphere. Gases stream upward and the sky darkens \u2014 in the sim, clouds rise and the blue fades to black.' },
-  { q: /time|dilation/i, a: 'Time dilation: clocks near the black hole tick slower relative to faraway observers; at the horizon, infalling objects appear frozen. The sim\u2019s timeline is simplified and does not model this.' },
-  { q: /survive|safe|escape/i, a: 'Escape velocity at the horizon equals light speed \u2014 nothing gets out. Earth would be tidally disrupted long before reaching the horizon.' },
-  { q: /mass|how big|size/i, a: 'Effects depend enormously on mass and distance. A stellar-mass BH would tear Earth apart from afar; a supermassive one could swallow it whole. The sim uses a simplified generic black hole.' },
-  { q: /real|accurate|scientific/i, a: 'The timeline is compressed for storytelling. Real timescales depend on mass and approach velocity \u2014 from seconds to years. The SIMULATION MODE banner marks simplified visuals.' },
-  { q: /lahore|city|building|road/i, a: 'The voxel city is a stylized Lahore: road grid, apartment blocks, trees, street lights, cars and pedestrians. It is the human stage \u2014 the science is in the sky.' },
-  { q: /help|control/i, a: 'WASD move \u00b7 mouse look \u00b7 Shift sprint \u00b7 Space jump \u00b7 P pause \u00b7 R restart \u00b7 T timeline \u00b7 C cinematic \u00b7 V orbit view \u00b7 click to inspect.' },
-];
-function aiAnswer(q) {
-  for (const k of KB) if (k.q.test(q)) return k.a;
-  return 'In short: the black hole\u2019s gravity bends light (lensing), strips the atmosphere, then tidally disrupts Earth \u2014 deformation \u2192 disruption \u2192 fragmentation \u2192 accretion. Ask about lensing, the disk, the horizon, tides, time dilation, or survival.';
-}
-function appendChat(sender, text) {
-  const div = document.createElement('div');
-  div.className = 'msg ' + sender;
-  div.textContent = (sender === 'user' ? 'You: ' : 'AI: ') + text;
-  chatLog.appendChild(div);
-  chatLog.scrollTop = chatLog.scrollHeight;
-}
-chatSend.addEventListener('click', () => {
-  const msg = chatInput.value.trim();
-  if (!msg) return;
-  appendChat('user', msg);
-  setTimeout(() => appendChat('ai', aiAnswer(msg)), 350);
-  chatInput.value = '';
-});
-chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') chatSend.click(); });
-chatMin.addEventListener('click', () => chatLog.classList.toggle('hidden'));
-
 // ---------- object inspection ----------
 const raycaster = new THREE.Raycaster();
 const center = new THREE.Vector2(0, 0);
@@ -331,16 +301,11 @@ function animate() {
   if (!paused) {
     elapsed += dt;
     dtLast = dt;
-    if (!cinematic && !orbitView) movePlayer(dt);
+    if (!cinematic) movePlayer(dt);
     updateCinematic(dt);
     if (!cinematic && playing) setSimTime(simTime + dt * 0.008 * speedMult);
-    if (orbitView) {
-      const a = elapsed * 0.08;
-      camera.position.set(Math.cos(a) * 300, 160, Math.sin(a) * 300);
-      camera.lookAt(0, 0, 0);
-    }
     const shake = world.state.shake;
-    if (shake > 0 && !orbitView) {
+    if (shake > 0) {
       camera.position.x += (Math.random() - 0.5) * shake * 0.3;
       camera.position.y += (Math.random() - 0.5) * shake * 0.2;
     }

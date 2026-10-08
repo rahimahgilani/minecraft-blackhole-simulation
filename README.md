@@ -25,7 +25,7 @@ on first load.
 | Feature | Description |
 |---------|-------------|
 | **First-person city** | A voxel Lahore — road grid, apartment blocks, trees, street lamps, moving cars and pedestrians. Walk it in first person or fly. |
-| **Real-time timeline** | A live `T+` HUD clock maps the slider to simulated time: 1 sec → 1 min → 1 hour → 1 day → 1 week → **3 weeks (final)**. Speed control: ×1 / ×60 / ×3600. |
+| **Real-time timeline** | A live `T+` HUD clock maps the slider to simulated time: 1 sec → 1 min → 1 hour → 1 day → 1 week → **6 weeks (final)**. Speed control: ×0.5 / ×0.75 / ×1 / ×1.25 / ×1.5 / ×2. |
 | **Day → catastrophe lighting** | Bright blue day → golden warning → blood-red dusk → a void lit only by the accretion disk's orange glow. |
 | **Escalating catastrophes** | The Moon cracks and shatters, the atmosphere streams away, the ocean draws back before a tsunami crest rolls through, magma erupts from widening fissures, and debris spirals into the disk. |
 | **Spaghettification** | People, cars and buildings are pulled skyward and visibly stretched along the pull direction as tidal forces win. |
@@ -46,7 +46,7 @@ on first load.
 | Click object | Inspect distance |
 | `P` / `R` | Pause / restart |
 | `T` | Toggle timeline |
-| `C` / `V` | Cinematic mode / orbit view |
+| `C` | Cinematic mode |
 | Timeline slider | Scrub the whole catastrophe |
 
 ## ⏱ The Timeline
@@ -60,7 +60,8 @@ The slider is nonlinear so the early seconds stay watchable:
 | 10–25 % | 1 min → 1 hour |
 | 25–45 % | 1 hour → 1 day |
 | 45–70 % | 1 day → 1 week |
-| 70–100 % | 1 week → 3 weeks (final) |
+| 70–85 % | 1 week → 2 weeks |
+| 85–100 % | 2 weeks → 6 weeks (final) |
 
 What you see at each milestone:
 
@@ -72,7 +73,12 @@ What you see at each milestone:
 | 1 HOUR | The atmosphere begins streaming toward the black hole. |
 | 1 DAY | The Moon shatters; the ocean draws back, then a tsunami crest rolls in. |
 | 1 WEEK | Magma fountains from the fissures; a spout stretches the sea into the sky. |
-| 2–3 WEEKS | Earth is a glowing spiral of debris feeding the accretion disk. |
+| 2 WEEKS | The city tears loose and streams upward, stretching into glowing filaments. |
+| 4–6 WEEKS | The last fragments stretch, glow and cross the horizon — Earth is gone. |
+
+The simulation ends **only** when Earth is fully consumed: at the final milestone
+an "EARTH IS GONE" veil appears and playback stops, with every fragment of the
+planet having crossed the event horizon.
 
 ## 📚 How It Works
 

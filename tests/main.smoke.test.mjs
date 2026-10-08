@@ -40,7 +40,7 @@ assert.strictEqual(elements.get('phase-label').textContent, 'NORMAL', 'phase lab
 ok('engine boots headlessly (renderer, world, black hole, HUD wiring)');
 
 // --- clock mapping: timeline position -> simulated seconds ---
-const stops = [[0, 0], [0.05, 1], [0.10, 60], [0.25, 3600], [0.45, 86400], [0.70, 604800], [1.0, 1814400]];
+const stops = [[0, 0], [0.05, 1], [0.10, 60], [0.25, 3600], [0.45, 86400], [0.70, 604800], [0.85, 1209600], [0.93, 2419200], [1.0, 3628800]];
 for (const [t, s] of stops) assert.ok(Math.abs(simSeconds(t) - s) < 1e-6, `simSeconds(${t}) should be ${s}`);
 let prev = -1;
 for (let i = 0; i <= 100; i++) {
@@ -48,7 +48,7 @@ for (let i = 0; i <= 100; i++) {
   assert.ok(s >= prev, 'clock mapping is monotonic');
   prev = s;
 }
-ok('clock mapping hits every stop (1s/1min/1h/1d/1w/3w) and is monotonic');
+ok('clock mapping hits every stop (1s/1min/1h/1d/1w/2w/4w/6w) and is monotonic');
 
 // --- clock formatting ---
 assert.strictEqual(formatClock(0), 'T+ 00:00:00');
@@ -57,7 +57,7 @@ assert.strictEqual(formatClock(60), 'T+ 00:01:00');
 assert.strictEqual(formatClock(3600), 'T+ 01:00:00');
 assert.strictEqual(formatClock(90061), 'T+ 1d 01:01:01');
 assert.strictEqual(formatClock(604800), 'T+ 1w 00:00:00');
-assert.strictEqual(formatClock(1814400), 'T+ 3w 00:00:00');
+assert.strictEqual(formatClock(3628800), 'T+ 6w 00:00:00');
 ok('clock formats seconds, minutes, hours, days and weeks');
 
 // --- phase lookup across the new timeline ---
@@ -67,8 +67,8 @@ assert.strictEqual(phaseFor(0.12).title, '1 MIN');
 assert.strictEqual(phaseFor(0.30).title, '1 HOUR');
 assert.strictEqual(phaseFor(0.50).title, '1 DAY');
 assert.strictEqual(phaseFor(0.75).title, '1 WEEK');
-assert.strictEqual(phaseFor(0.90).title, '2-3 WEEKS / FINAL');
-assert.strictEqual(phaseFor(1).title, '2-3 WEEKS / FINAL');
+assert.strictEqual(phaseFor(0.90).title, '2 WEEKS');
+assert.strictEqual(phaseFor(1).title, '4-6 WEEKS / FINAL');
 ok('phaseFor matches the new seconds-to-weeks timeline');
 
 console.log('\nALL ' + passed + ' MAIN TEST GROUPS PASSED');

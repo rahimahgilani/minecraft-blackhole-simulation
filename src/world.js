@@ -48,13 +48,15 @@ export function createWorld(scene) {
   const isRoadX = (x) => Math.abs(((x % ROAD_EVERY) + ROAD_EVERY) % ROAD_EVERY - 0) < 3;
   const isRoadZ = (z) => Math.abs(((z % ROAD_EVERY) + ROAD_EVERY) % ROAD_EVERY - 0) < 3;
 
-  // ground plane (single big slab for perf) + road strips
-  box(CITY * 2, 0.5, CITY * 2, M.grass, 0, -0.25, 0);
+  // ground plane (single big slab for perf) + road strips, grouped for the end-state
+  const baseGroup = new THREE.Group();
+  group.add(baseGroup);
+  box(CITY * 2, 0.5, CITY * 2, M.grass, 0, -0.25, 0, baseGroup);
   for (let i = -CITY; i <= CITY; i += ROAD_EVERY) {
-    box(6, 0.52, CITY * 2, M.road, i, 0.01, 0);   // roads along z
-    box(CITY * 2, 0.52, 6, M.road, 0, 0.02, i);   // roads along x
-    box(8.5, 0.53, CITY * 2, M.footpath, i, 0.015, 0);
-    box(CITY * 2, 0.53, 8.5, M.footpath, 0, 0.025, i);
+    box(6, 0.52, CITY * 2, M.road, i, 0.01, 0, baseGroup);   // roads along z
+    box(CITY * 2, 0.52, 6, M.road, 0, 0.02, i, baseGroup);   // roads along x
+    box(8.5, 0.53, CITY * 2, M.footpath, i, 0.015, 0, baseGroup);
+    box(CITY * 2, 0.53, 8.5, M.footpath, 0, 0.025, i, baseGroup);
   }
 
   // ---------- buildings ----------
@@ -324,10 +326,22 @@ export function createWorld(scene) {
       }
       if (t > 0.6) { // lift toward BH in late phases, spaghettifying as they rise
         const lift = Math.max(0, (t - 0.55) * 2.2) * Math.min(1, 30 / (c.position.distanceTo(bhPos) + 1));
-        c.position.y = lift * 6;
+        if (t <= 0.85) c.position.y = lift * 6; // lift phase; infall owns y afterwards
         c.lookAt(bhPos);
-        const stretch = 1 + lift * 1.6;
-        c.scale.set(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch));
+        // stretch along the PULL axis: after lookAt, local +Z points at the BH
+        const stretch = 1 + lift * 2.2;
+        c.scale.set(1 / Math.sqrt(stretch), 1 / Math.sqrt(stretch), stretch);
+        // beading: body parts separate into droplets along the pull line
+        c.children.forEach((ch, i) => {
+          if (ch.userData.baseZ === undefined) ch.userData.baseZ = ch.position.z;
+          ch.position.z = ch.userData.baseZ + (i - 2.5) * (stretch - 1) * 0.55;
+        });
+        // late-phase infall: accelerate toward the BH, consumed on arrival
+        if (t > 0.85) {
+          const dir = new THREE.Vector3().subVectors(bhPos, c.position).normalize();
+          c.position.addScaledVector(dir, (t - 0.85) * 600 * dt);
+          if (c.position.distanceTo(bhPos) < 8) c.visible = false;
+        }
       } else { c.position.y = 0; c.scale.set(1, 1, 1); }
     }
 
@@ -342,10 +356,22 @@ export function createWorld(scene) {
       p.position.z = THREE.MathUtils.clamp(p.position.z, -CITY + 4, CITY - 4);
       if (t > 0.55) { // people pulled off the ground, stretched into filaments
         const lift = Math.max(0, (t - 0.45) * 2) * Math.min(1, 25 / (p.position.distanceTo(bhPos) + 1));
-        p.position.y = lift * 10;
+        if (t <= 0.85) p.position.y = lift * 10; // lift phase; infall owns y afterwards
         p.lookAt(bhPos);
-        const stretch = 1 + lift * 2.4;
-        p.scale.set(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch));
+        // stretch along the PULL axis: after lookAt, local +Z points at the BH
+        const stretch = 1 + lift * 3.2;
+        p.scale.set(1 / Math.sqrt(stretch), 1 / Math.sqrt(stretch), stretch);
+        // beading: torso/head/legs separate into droplets along the pull line
+        p.children.forEach((ch, i) => {
+          if (ch.userData.baseZ === undefined) ch.userData.baseZ = ch.position.z;
+          ch.position.z = ch.userData.baseZ + (i - 1) * (stretch - 1) * 0.4;
+        });
+        // late-phase infall: accelerate toward the BH, consumed on arrival
+        if (t > 0.85) {
+          const dir = new THREE.Vector3().subVectors(bhPos, p.position).normalize();
+          p.position.addScaledVector(dir, (t - 0.85) * 600 * dt);
+          if (p.position.distanceTo(bhPos) < 8) p.visible = false;
+        }
       } else {
         p.position.y = Math.abs(Math.sin(p.userData.t * 8)) * 0.08 * life;
         p.scale.set(1, 1, 1);
@@ -489,7 +515,7 @@ export function createWorld(scene) {
     // ambient debris spawns: more matter tears free as the end nears
     if (t > 0.6 && Math.random() < t * 0.3) spawnDebris({ x: rnd(-CITY, CITY), y: rnd(0, 6), z: rnd(-CITY, CITY) }, 1 + t);
 
-    // building destruction: lean, sink, collapse
+    // building destruction: lean, sink, collapse, then spaghettify and stream to the BH
     const dest = THREE.MathUtils.smoothstep(t, 0.35, 0.95);
     state.destroyed = dest;
     for (const b of buildings) {
@@ -498,6 +524,19 @@ export function createWorld(scene) {
       b.g.rotation.x = k * 0.22 * (b.phase > 0.3 ? 1 : -1);
       b.g.position.y = -k * b.h * 0.45;
       if (k > 0.15 && Math.random() < 0.02 * k) spawnDebris(b.g.position, 1 + t);
+      // late phase: torn loose, stretched along the pull axis, consumed
+      if (t > 0.8 && b.g.visible) {
+        const lift = Math.max(0, (t - 0.8) * 4) * Math.min(1, 40 / (b.g.position.distanceTo(bhPos) + 1));
+        b.g.position.y = -k * b.h * 0.45 + lift * 14;
+        b.g.lookAt(bhPos);
+        const stretch = 1 + lift * 2.5;
+        b.g.scale.set(1 / Math.sqrt(stretch), 1 / Math.sqrt(stretch), stretch);
+        if (t > 0.9) {
+          const dir = new THREE.Vector3().subVectors(bhPos, b.g.position).normalize();
+          b.g.position.addScaledVector(dir, (t - 0.9) * 80 * dt);
+          if (b.g.position.distanceTo(bhPos) < 10) b.g.visible = false;
+        }
+      }
     }
 
     // debris physics: pulled toward BH, spiraling into streams late
@@ -532,6 +571,24 @@ export function createWorld(scene) {
 
     // camera shake grows with t
     state.shake = t > 0.25 ? (t - 0.25) * 0.5 : 0;
+
+    // END STATE (t = 1): Earth fully consumed — only the debris ribbon remains
+    if (t >= 1) {
+      baseGroup.visible = false;
+      for (const b of buildings) b.g.visible = false;
+      for (const c of cars) c.visible = false;
+      for (const p of peds) p.visible = false;
+      for (const tr of trees) tr.visible = false;
+      for (const c of cracks) c.visible = false;
+      ocean.visible = false;
+      seabed.visible = false;
+      crest.visible = false;
+      spout.visible = false;
+      moon.visible = false;
+      atmoMesh.visible = false;
+      magmaMesh.visible = false;
+      for (const c of chunks) c.visible = false;
+    }
   }
 
   return { group, buildings, cars, peds, ocean, crest, spout, moon, moonSphere, moonCracks, moonChunks, atmoMesh, magmaMesh, cracks, chunks, lights: { hemi, sun, amb, bhLight }, update, state, bhDir, spawnDebris };

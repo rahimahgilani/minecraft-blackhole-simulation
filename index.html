@@ -29,7 +29,6 @@
       <button id="btn-play">⏸ PAUSE</button>
       <button id="btn-restart">⟲ RESTART</button>
       <button id="btn-cinematic">🎬 CINEMATIC: OFF</button>
-      <button id="btn-orbit">🌍 ORBIT VIEW</button>
       <button id="btn-speed">⏩ SPEED ×1</button>
       <button id="btn-controls">⌨ CONTROLS</button>
     </div>
@@ -40,6 +39,7 @@
   <div id="edu-panel">
     <div id="edu-title">NORMAL</div>
     <div id="edu-text">Everything is normal. Earth is in its usual gravitational environment.</div>
+    <div id="edu-watch"></div>
     <div id="edu-real"></div>
     <div id="inspect-note"></div>
   </div>
@@ -51,22 +51,13 @@
     F — fly mode (Space up / Ctrl down)<br/>
     Click — inspect object &nbsp;|&nbsp; ESC — pause<br/>
     P — pause &nbsp;|&nbsp; R — restart &nbsp;|&nbsp; T — timeline<br/>
-    C — cinematic mode &nbsp;|&nbsp; V — orbit view
+    C — cinematic mode
   </div>
 
   <div id="timeline">
     <div id="milestones"></div>
     <input type="range" id="time-slider" min="0" max="1000" value="0" step="1" />
     <div id="timeline-labels"></div>
-  </div>
-
-  <div id="ai-chat">
-    <div id="chat-header"><span>ASK THE AI</span><button id="chat-min">—</button></div>
-    <div id="chat-log"></div>
-    <div id="chat-row">
-      <input type="text" id="chat-input" placeholder="Ask about the black hole…" />
-      <button id="chat-send">Send</button>
-    </div>
   </div>
 
   <div id="loading">LOADING SIMULATION…</div>
