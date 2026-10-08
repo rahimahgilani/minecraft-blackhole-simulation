@@ -48,18 +48,18 @@ ok('lighting: day bright at t=0, sun/hemi die, disk light rises by t=1');
 
 // --- coastal drawback + tsunami crest lifecycle (fresh world) ---
 const w2 = createWorld(scene);
-const baseX = w2.ocean.userData.baseX;
+const baseY = w2.ocean.userData.baseY;
 w2.update(0.3, 0.016, 1, bhPos);
-assert.strictEqual(w2.ocean.position.x, baseX, 'ocean in place before drawback');
+assert.ok(Math.abs(w2.ocean.position.y - baseY) < 0.2, 'sea at rest level before drawback');
 assert.strictEqual(w2.crest.visible, false, 'crest hidden before t=0.58');
 w2.update(0.55, 0.016, 1, bhPos);
-assert.ok(w2.ocean.position.x < baseX - 20, 'ocean drawn back exposing seabed');
+assert.ok(w2.ocean.position.y < baseY - 0.8, 'sea level dropped, exposing the sea floor');
 w2.update(0.65, 0.016, 1, bhPos);
-assert.strictEqual(w2.crest.visible, true, 'tsunami crest visible mid-roll');
-assert.ok(w2.crest.position.x > -95, 'crest advancing across the city');
+assert.strictEqual(w2.crest.visible, true, 'tsunami crest visible mid-closure');
+assert.ok(w2.crest.scale.x < 260, 'crest ring closing in from the sea');
 w2.update(0.9, 0.016, 1, bhPos);
-assert.strictEqual(w2.crest.visible, false, 'crest finished after sweep');
-ok('coastal drawback then tsunami crest rolls across the city');
+assert.strictEqual(w2.crest.visible, false, 'crest finished after closure');
+ok('coastal drawback (sea level drop) then tsunami crest closes in from the sea');
 
 // --- ocean spout ---
 const w3 = createWorld(scene);
@@ -69,10 +69,13 @@ w3.update(0.75, 0.016, 1, bhPos);
 assert.strictEqual(w3.spout.visible, true, 'spout visible in late phase');
 ok('ocean spout stretches water toward the black hole');
 
-// --- moon: intact -> cracked -> shattered ---
+// --- moon: visible, intact -> cracked -> shattered ---
 const w4 = createWorld(scene);
-w4.update(0.1, 0.016, 1, bhPos);
+assert.strictEqual(w4.moon.visible, true, 'moon present in the sky');
 assert.strictEqual(w4.moonSphere.visible, true, 'moon intact early');
+assert.strictEqual(w4.moonSphere.material.fog, false, 'moon fog-exempt (stays crisp)');
+assert.ok(w4.moon.position.y > 100, 'moon high in the sky');
+w4.update(0.1, 0.016, 1, bhPos);
 assert.strictEqual(w4.moonCracks[0].material.opacity < 0.1, true, 'moon cracks dark early');
 w4.update(0.35, 0.016, 1, bhPos);
 assert.ok(w4.moonCracks.some((mc) => mc.material.opacity > 0.1), 'moon cracks glowing at t=0.35 (pulsing, so check any)');
@@ -141,7 +144,8 @@ ok('final fragmentation: earth chunks spawn and spiral toward the black hole');
 const w11 = createWorld(scene);
 for (let i = 0; i < 60; i++) w11.update(i / 60, 0.016, i * 0.016, bhPos);
 w11.update(1, 0.016, 1, bhPos);
-assert.strictEqual(w11.group.children.some((ch) => ch === w11.ocean && ch.visible), false, 'ocean gone');
+assert.strictEqual(w11.ocean.visible, false, 'ocean gone');
+assert.strictEqual(w11.seaFloor === undefined || w11.seaFloor.visible === false, true, 'sea floor gone');
 assert.strictEqual(w11.moon.visible, false, 'moon gone');
 assert.strictEqual(w11.spout.visible, false, 'spout gone');
 assert.strictEqual(w11.atmoMesh.visible, false, 'atmosphere gone');

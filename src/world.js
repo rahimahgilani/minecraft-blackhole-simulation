@@ -48,10 +48,9 @@ export function createWorld(scene) {
   const isRoadX = (x) => Math.abs(((x % ROAD_EVERY) + ROAD_EVERY) % ROAD_EVERY - 0) < 3;
   const isRoadZ = (z) => Math.abs(((z % ROAD_EVERY) + ROAD_EVERY) % ROAD_EVERY - 0) < 3;
 
-  // ground plane (single big slab for perf) + road strips, grouped for the end-state
+  // roads + footpaths (the land plate is built in the sea section below)
   const baseGroup = new THREE.Group();
   group.add(baseGroup);
-  box(CITY * 2, 0.5, CITY * 2, M.grass, 0, -0.25, 0, baseGroup);
   for (let i = -CITY; i <= CITY; i += ROAD_EVERY) {
     box(6, 0.52, CITY * 2, M.road, i, 0.01, 0, baseGroup);   // roads along z
     box(CITY * 2, 0.52, 6, M.road, 0, 0.02, i, baseGroup);   // roads along x
@@ -75,6 +74,7 @@ export function createWorld(scene) {
     const b = new THREE.Group();
     b.position.set(x, 0, z);
     const body = box(w, h, d, wallMat, 0, h / 2, 0, b);
+    box(w + 1.2, 0.3, d + 1.2, M.dirt, 0, 0.15, 0, b); // foundation plinth, firmly on the land
     // window bands on 4 sides
     const floors = Math.max(1, Math.floor(h / 3));
     for (let f = 0; f < floors; f++) {
@@ -100,7 +100,7 @@ export function createWorld(scene) {
       const distFromCenter = Math.hypot(bx, bz);
       const h = distFromCenter > 45 ? rnd(6, 14) : rnd(4, 10);
       const wm = [M.wallA, M.wallB, M.wallC, M.wallD][Math.floor(Math.random() * 4)];
-      addBuilding(bx + rnd(-2, 2), bz + rnd(-2, 2), w, d, h, wm);
+      addBuilding(bx, bz, w, d, h, wm); // exact block centers: erect, never clipping roads
     }
   }
 
@@ -185,21 +185,35 @@ export function createWorld(scene) {
     group.add(cl); clouds.push(cl);
   }
 
-  // ---------- ocean, coastal drawback & tsunami crest ----------
-  const seabed = box(80, 0.3, CITY * 2, mat(0x8a7a5a), -CITY - 38, 0.05, 0);
+  // ---------- the sea: the island is surrounded on all sides ----------
+  const seaFloor = box(1400, 0.5, 1400, mat(0x8a7a5a), 0, -1.05, 0);   // exposed during drawback
+  const rockBase = box(180, 3, 180, mat(0x6b5a44), 0, -3.5, 0);        // island root, visible at low water
+  const sandRim = box(CITY * 2 + 30, 0.5, CITY * 2 + 30, mat(0xd9c489), 0, -0.3, 0); // beach ring
+  const landPlate = box(CITY * 2, 2, CITY * 2, M.grass, 0, -1, 0);     // raised land, top at y=0
   const oceanMat = new THREE.MeshLambertMaterial({ color: 0x2a7ec4, transparent: true, opacity: 0.85 });
-  const ocean = box(80, 0.6, CITY * 2, oceanMat, -CITY - 38, 0.35, 0);
-  ocean.userData.baseX = ocean.position.x;
+  const ocean = box(1400, 0.7, 1400, oceanMat, 0, -0.9, 0);            // sea surface
+  ocean.userData.baseY = ocean.position.y;
+  // tsunami crest: a ring wall of water that closes in from the sea onto the island
   const crest = new THREE.Group();
-  const crestWall = box(5, 12, CITY * 2 + 40, new THREE.MeshLambertMaterial({ color: 0x2a7ec4, transparent: true, opacity: 0.8 }), 0, 6, 0, crest);
-  const crestFoam = box(5.5, 1.2, CITY * 2 + 40, new THREE.MeshBasicMaterial({ color: 0xeaf6ff, transparent: true, opacity: 0.9 }), 0, 12.4, 0, crest);
+  const crestWall = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 12, 64, 1, true),
+    new THREE.MeshLambertMaterial({ color: 0x2a7ec4, transparent: true, opacity: 0.8, side: THREE.DoubleSide })
+  );
+  crestWall.position.y = 6;
+  crest.add(crestWall);
+  const crestFoam = new THREE.Mesh(
+    new THREE.CylinderGeometry(1, 1, 1.2, 64, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xeaf6ff, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
+  );
+  crestFoam.position.y = 12.4;
+  crest.add(crestFoam);
   crest.visible = false;
   group.add(crest);
 
   // ---------- ocean spout (water column stretched toward the black hole) ----------
   const spoutMat = new THREE.MeshLambertMaterial({ color: 0x6fb8e8, transparent: true, opacity: 0.35 });
   const spout = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 6, 130, 12, 1, true), spoutMat);
-  spout.position.set(-CITY - 30, 60, 0);
+  spout.position.set(-CITY - 30, 59, 0); // base at sea level, over the sea
   spout.rotation.z = -0.3; // lean toward the black hole side
   spout.visible = false;
   group.add(spout);
@@ -224,8 +238,11 @@ export function createWorld(scene) {
   }
 
   // ---------- the Moon (tidal foreshadowing: cracks, then shatters) ----------
+  // large, high, opposite the BH approach path, fog-exempt so it stays crisp
   const moon = new THREE.Group();
-  const moonSphere = new THREE.Mesh(new THREE.SphereGeometry(9, 24, 24), mat(0xbfc4cc));
+  const moonMat = mat(0xd8dce4);
+  moonMat.fog = false;
+  const moonSphere = new THREE.Mesh(new THREE.SphereGeometry(14, 32, 32), moonMat);
   moon.add(moonSphere);
   const moonCracks = [];
   for (let i = 0; i < 7; i++) {
@@ -245,7 +262,7 @@ export function createWorld(scene) {
     mc.userData = { v: new THREE.Vector3(), spin: rnd(-0.8, 0.8) };
     moonChunks.push(mc);
   }
-  moon.position.set(-150, 100, -140);
+  moon.position.set(-170, 130, -170); // high, opposite the BH approach (+Z side)
   group.add(moon);
 
   // ---------- atmosphere stripping (wisps streaming to the black hole) ----------
@@ -389,19 +406,18 @@ export function createWorld(scene) {
       if (t > 0.6) tr.rotation.z += (t - 0.6) * 2 * Math.min(1, 20 / (tr.position.distanceTo(bhPos) + 1));
     }
 
-    // coastal drawback: the ocean slides back, exposing the seabed
+    // coastal drawback: sea level drops, exposing the sea floor all around the island
     const drawback = THREE.MathUtils.smoothstep(t, 0.5, 0.58);
-    ocean.position.x = ocean.userData.baseX - drawback * 42;
+    ocean.position.y = ocean.userData.baseY + Math.sin(elapsed * 0.8) * 0.05 - drawback * 1.5;
     oceanMat.opacity = 0.85 - drawback * 0.15;
 
-    // tsunami crest: one huge wall with a foam edge rolling across the city
+    // tsunami crest: a ring wall closing in from the sea onto the island
     const crestT = THREE.MathUtils.smoothstep(t, 0.58, 0.72);
     crest.visible = crestT > 0.001 && crestT < 0.999;
     if (crest.visible) {
-      crest.position.x = -CITY - 45 + crestT * (CITY * 2 + 55);
-      const grow = Math.sin(crestT * Math.PI);
-      crest.scale.y = 0.7 + grow * 1.1;
-      crest.rotation.z = -crestT * 0.3; // crest leans as it breaks
+      const r = 260 - crestT * 230; // closes in from the sea (r=260) to the city (r=30)
+      crest.scale.set(r, 0.7 + Math.sin(crestT * Math.PI) * 1.1, r);
+      crest.rotation.y = elapsed * 0.4; // slow swirl as it closes in
       crestWall.material.opacity = 0.8 * (1 - crestT * 0.4);
       crestFoam.material.opacity = 0.9 * (1 - crestT * 0.5);
     }
@@ -581,7 +597,7 @@ export function createWorld(scene) {
       for (const tr of trees) tr.visible = false;
       for (const c of cracks) c.visible = false;
       ocean.visible = false;
-      seabed.visible = false;
+      seaFloor.visible = false;
       crest.visible = false;
       spout.visible = false;
       moon.visible = false;
