@@ -3,31 +3,72 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>What If a Black Hole Swallowed Earth?</title>
+  <title>What If a Black Hole Swallowed Earth? — Lahore Simulation</title>
   <link rel="stylesheet" href="style.css" />
-  <script type="module" src="main.js"></script>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
 <body>
   <div id="viewport"></div>
-  <div id="timeline">
-    <input type="range" id="time-slider" min="0" max="100" value="0" />
-    <div id="timeline-labels">
-      <span id="label-normal">NORMAL</span>
-      <span id="label-1s">1 SEC</span>
-      <span id="label-10s">10 SEC</span>
-      <span id="label-1m">1 MIN</span>
-      <span id="label-1h">1 HOUR</span>
-      <span id="label-1d">1 DAY</span>
-      <span id="label-final">FINAL</span>
+  <div id="crosshair"></div>
+  <div id="lock-hint">CLICK TO LOOK AROUND &nbsp;•&nbsp; WASD TO MOVE</div>
+
+  <div id="hud-top">
+    <div id="title-block">
+      <h1>WHAT IF A BLACK HOLE SWALLOWED EARTH?</h1>
+      <div id="phase-label">NORMAL</div>
+    </div>
+    <div id="top-buttons">
+      <button id="btn-play">⏸ PAUSE</button>
+      <button id="btn-restart">⟲ RESTART</button>
+      <button id="btn-cinematic">🎬 CINEMATIC: OFF</button>
+      <button id="btn-orbit">🌍 ORBIT VIEW</button>
+      <button id="btn-controls">⌨ CONTROLS</button>
     </div>
   </div>
+
+  <div id="sim-mode">SIMULATION MODE — educational visualization. Timescales and effects are simplified.</div>
+
+  <div id="edu-panel">
+    <div id="edu-title">NORMAL</div>
+    <div id="edu-text">Everything is normal. Earth is in its usual gravitational environment.</div>
+    <div id="edu-real"></div>
+    <div id="inspect-note"></div>
+  </div>
+
+  <div id="controls-panel" class="hidden">
+    <b>CONTROLS</b><br/>
+    W A S D — move &nbsp;|&nbsp; Mouse — look<br/>
+    Shift — sprint &nbsp;|&nbsp; Space — jump<br/>
+    F — fly mode (Space up / Ctrl down)<br/>
+    Click — inspect object &nbsp;|&nbsp; ESC — pause<br/>
+    P — pause &nbsp;|&nbsp; R — restart &nbsp;|&nbsp; T — timeline<br/>
+    C — cinematic mode &nbsp;|&nbsp; V — orbit view
+  </div>
+
+  <div id="timeline">
+    <div id="milestones"></div>
+    <input type="range" id="time-slider" min="0" max="1000" value="0" step="1" />
+    <div id="timeline-labels"></div>
+  </div>
+
   <div id="ai-chat">
+    <div id="chat-header"><span>ASK THE AI</span><button id="chat-min">—</button></div>
     <div id="chat-log"></div>
-    <input type="text" id="chat-input" placeholder="Ask a question…" />
-    <button id="chat-send">Send</button>
+    <div id="chat-row">
+      <input type="text" id="chat-input" placeholder="Ask about the black hole…" />
+      <button id="chat-send">Send</button>
+    </div>
   </div>
-  <div id="simulation-mode">
-    <p>SIMULATION MODE: This is an educational visualization. Timescales and effects are simplified.</p>
-  </div>
+
+  <div id="loading">LOADING SIMULATION…</div>
+
+  <script type="module" src="main.js"></script>
 </body>
 </html>

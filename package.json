@@ -1,0 +1,7 @@
+{
+  "name": "minecraft-blackhole-simulation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minecraft-style black hole Earth simulation (Three.js). node_modules/three is a test-only stub; the browser loads real Three.js from the CDN importmap."
+}
