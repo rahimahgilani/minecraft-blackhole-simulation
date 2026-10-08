@@ -8,6 +8,7 @@ const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
 const phaseLabel = $('phase-label');
 const simClock = $('sim-clock');
+const dilationEl = $('dilation');
 const eduTitle = $('edu-title');
 const eduText = $('edu-text');
 const eduReal = $('edu-real');
@@ -157,6 +158,11 @@ function setSimTime(t) {
   eduReal.textContent = 'Physically: ' + ph.real;
   eduWatch.textContent = 'WATCH FOR: ' + ph.watch;
   simClock.textContent = formatClock(simSeconds(simTime));
+  // gravitational time dilation (simplified): clocks near the BH tick slower
+  const dil = 1 / Math.sqrt(1 - Math.min(0.96, approach * approach * 0.96));
+  dilationEl.textContent = approach > 0.02
+    ? 'TIME DILATION \u00d7' + dil.toFixed(2) + ' \u2014 your clock runs ' + Math.round((1 - 1 / dil) * 100) + '% slower than faraway clocks'
+    : '';
   // the sim ends only when Earth is fully consumed (t = 1)
   const ended = simTime >= 1;
   endVeil.classList.toggle('hidden', !ended);
@@ -186,7 +192,17 @@ function setPaused(v) {
   pauseVeil.classList.toggle('hidden', !paused);
 }
 btnPlay.addEventListener('click', () => setPaused(!paused));
-btnRestart.addEventListener('click', () => { setSimTime(0); setPaused(false); });
+btnRestart.addEventListener('click', () => {
+  world.reset();
+  camera.position.set(0, EYE, 0);
+  vy = 0;
+  velocity.set(0, 0, 0);
+  playing = true;
+  endVeil.classList.add('hidden');
+  dilationEl.textContent = '';
+  setSimTime(0);
+  setPaused(false);
+});
 btnCinematic.addEventListener('click', () => {
   cinematic = !cinematic;
   btnCinematic.textContent = cinematic ? '\ud83c\udfac CINEMATIC: ON' : '\ud83c\udfac CINEMATIC: OFF';

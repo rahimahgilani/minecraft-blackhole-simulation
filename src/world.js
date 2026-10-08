@@ -182,6 +182,7 @@ export function createWorld(scene) {
     for (let j = 0; j < n; j++)
       box(rnd(6, 14), rnd(1.5, 3), rnd(4, 9), M.cloud, rnd(-6, 6), rnd(-1, 1), rnd(-4, 4), cl);
     cl.position.set(rnd(-CITY, CITY), rnd(38, 60), rnd(-CITY, CITY));
+    cl.userData.baseY = cl.position.y;
     group.add(cl); clouds.push(cl);
   }
 
@@ -218,11 +219,12 @@ export function createWorld(scene) {
   spout.visible = false;
   group.add(spout);
 
-  // ---------- glowing ground cracks ----------
+  // ---------- glowing ground cracks (dramatic crust failure) ----------
   const cracks = [];
-  for (let i = 0; i < 26; i++) {
+  for (let i = 0; i < 40; i++) {
     const cm = new THREE.MeshBasicMaterial({ color: 0xff5a1f, transparent: true, opacity: 0 });
-    const c = box(rnd(3, 9), 0.06, rnd(0.5, 1.2), cm, rnd(-CITY, CITY), 0.06, rnd(-CITY, CITY));
+    const c = box(rnd(4, 14), 0.08, rnd(0.6, 2.2), cm, rnd(-CITY, CITY), 0.06, rnd(-CITY, CITY));
+    c.rotation.y = rnd(0, Math.PI); // fissures in every direction
     c.visible = false;
     cracks.push(c);
   }
@@ -262,7 +264,7 @@ export function createWorld(scene) {
     mc.userData = { v: new THREE.Vector3(), spin: rnd(-0.8, 0.8) };
     moonChunks.push(mc);
   }
-  moon.position.set(-170, 130, -170); // high, opposite the BH approach (+Z side)
+  moon.position.set(70, 115, 190); // close to where the black hole forms (0,120,260) — its first victim
   group.add(moon);
 
   // ---------- atmosphere stripping (wisps streaming to the black hole) ----------
@@ -398,12 +400,27 @@ export function createWorld(scene) {
     for (const cl of clouds) {
       cl.position.x += 1.2 * dt * (0.3 + life);
       if (cl.position.x > CITY + 20) cl.position.x = -CITY - 20;
-      if (t > 0.5) cl.position.y += (t - 0.5) * 8 * dt; // atmosphere stripped upward
+      if (t > 0.5) { // stretched into filaments while being stripped upward
+        cl.position.y += (t - 0.5) * 8 * dt;
+        const stretch = 1 + Math.min(4, (t - 0.5) * 6);
+        cl.scale.set(1 / Math.sqrt(stretch), 1 / Math.sqrt(stretch), stretch);
+      }
     }
 
     for (const tr of trees) {
       tr.rotation.z = Math.sin(elapsed * 1.3 + tr.position.x) * 0.03 * life;
-      if (t > 0.6) tr.rotation.z += (t - 0.6) * 2 * Math.min(1, 20 / (tr.position.distanceTo(bhPos) + 1));
+      if (t > 0.6) { // uprooted, stretched along the pull axis, then consumed
+        const lift = Math.max(0, (t - 0.6) * 2) * Math.min(1, 20 / (tr.position.distanceTo(bhPos) + 1));
+        tr.lookAt(bhPos);
+        const stretch = 1 + lift * 2.5;
+        tr.scale.set(1 / Math.sqrt(stretch), 1 / Math.sqrt(stretch), stretch);
+        if (t <= 0.85) tr.position.y = lift * 8;
+        if (t > 0.85) {
+          const dir = new THREE.Vector3().subVectors(bhPos, tr.position).normalize();
+          tr.position.addScaledVector(dir, (t - 0.85) * 600 * dt);
+          if (tr.position.distanceTo(bhPos) < 8) tr.visible = false;
+        }
+      }
     }
 
     // coastal drawback: sea level drops, exposing the sea floor all around the island
@@ -497,14 +514,25 @@ export function createWorld(scene) {
       magmaMesh.instanceMatrix.needsUpdate = true;
     }
 
-    // glowing ground cracks spread, widen and heat up as the crust strains
-    const crackT = THREE.MathUtils.smoothstep(t, 0.42, 0.85);
+    // glowing ground cracks: early onset, spreading wide, hotter, with raised crust edges
+    const crackT = THREE.MathUtils.smoothstep(t, 0.3, 0.8);
     for (const c of cracks) {
       c.visible = crackT > 0.01;
-      c.material.opacity = crackT * (0.45 + 0.4 * Math.sin(elapsed * 4 + c.position.x * 0.7));
-      c.scale.x = 1 + crackT * 1.6; // fissures widen
-      const hot = 0.35 + 0.25 * Math.sin(elapsed * 4 + c.position.z);
-      c.material.color.setRGB(1, hot, 0.08);
+      c.material.opacity = crackT * (0.5 + 0.4 * Math.sin(elapsed * 4 + c.position.x * 0.7));
+      c.scale.x = 1 + crackT * 2.2; // fissures widen hard
+      const hot = 0.3 + 0.3 * Math.sin(elapsed * 4 + c.position.z);
+      c.material.color.setRGB(1, hot, 0.05);
+    }
+    // crust edges heave up beside the fissures as the ground splits
+    const heaveT = THREE.MathUtils.smoothstep(t, 0.45, 0.8);
+    for (const c of cracks) {
+      if (!c.userData.lip) {
+        c.userData.lip = box(c.scale.x * 2, 0.5, 0.5, M.dirt, c.position.x, 0.1, c.position.z + 1.4);
+        c.userData.lip.rotation.y = c.rotation.y;
+      }
+      c.userData.lip.visible = heaveT > 0.01;
+      c.userData.lip.position.y = 0.1 + heaveT * 0.9;
+      c.userData.lip.rotation.x = heaveT * 0.5; // tilts up as the crust buckles
     }
 
     // final fragmentation: slabs of earth tear free and spiral into the BH
@@ -607,5 +635,60 @@ export function createWorld(scene) {
     }
   }
 
-  return { group, buildings, cars, peds, ocean, crest, spout, moon, moonSphere, moonCracks, moonChunks, atmoMesh, magmaMesh, cracks, chunks, lights: { hemi, sun, amb, bhLight }, update, state, bhDir, spawnDebris };
+  // ---------- full reset (restart button): everything back to normal ----------
+  function reset() {
+    baseGroup.visible = true;
+    for (const b of buildings) {
+      b.g.visible = true;
+      b.g.rotation.set(0, 0, 0);
+      b.g.position.y = 0;
+      b.g.scale.set(1, 1, 1);
+    }
+    for (const c of cars) {
+      c.visible = true;
+      c.position.y = 0;
+      c.scale.set(1, 1, 1);
+      c.children.forEach((ch) => { if (ch.userData.baseZ !== undefined) ch.position.z = ch.userData.baseZ; });
+    }
+    for (const p of peds) {
+      p.visible = true;
+      p.position.y = 0;
+      p.scale.set(1, 1, 1);
+      p.children.forEach((ch) => { if (ch.userData.baseZ !== undefined) ch.position.z = ch.userData.baseZ; });
+    }
+    for (const tr of trees) {
+      tr.visible = true;
+      tr.position.y = 0;
+      tr.scale.set(1, 1, 1);
+    }
+    for (const cl of clouds) {
+      cl.position.y = cl.userData.baseY;
+      cl.scale.set(1, 1, 1);
+    }
+    for (const c of cracks) {
+      c.visible = false;
+      c.material.opacity = 0;
+      c.scale.x = 1;
+      if (c.userData.lip) c.userData.lip.visible = false;
+    }
+    ocean.visible = true;
+    ocean.position.y = ocean.userData.baseY;
+    oceanMat.opacity = 0.85;
+    seaFloor.visible = true;
+    crest.visible = false;
+    spout.visible = false;
+    moon.visible = true;
+    moonSphere.visible = true;
+    for (const mc of moonCracks) mc.material.opacity = 0;
+    for (const mc of moonChunks) mc.visible = false;
+    atmoMesh.visible = false;
+    for (const a of atmo) a.active = false;
+    magmaMesh.visible = false;
+    for (const d of debris) d.active = false;
+    for (const c of chunks) c.visible = false;
+    state.shake = 0;
+    state.destroyed = 0;
+  }
+
+  return { group, buildings, cars, peds, ocean, crest, spout, moon, moonSphere, moonCracks, moonChunks, atmoMesh, magmaMesh, cracks, chunks, lights: { hemi, sun, amb, bhLight }, update, reset, state, bhDir, spawnDebris };
 }
