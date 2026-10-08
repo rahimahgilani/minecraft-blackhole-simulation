@@ -183,16 +183,24 @@ export function createWorld(scene) {
     group.add(cl); clouds.push(cl);
   }
 
-  // ---------- tidal waves (water walls sweeping the city) ----------
-  const waves = [0.5, 0.68].map((t0) => {
-    const m = new THREE.MeshBasicMaterial({
-      color: 0x3a9ad0, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false,
-    });
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 5, 48, 1, true), m);
-    mesh.visible = false;
-    group.add(mesh);
-    return { mesh, t0 };
-  });
+  // ---------- ocean, coastal drawback & tsunami crest ----------
+  const seabed = box(80, 0.3, CITY * 2, mat(0x8a7a5a), -CITY - 38, 0.05, 0);
+  const oceanMat = new THREE.MeshLambertMaterial({ color: 0x2a7ec4, transparent: true, opacity: 0.85 });
+  const ocean = box(80, 0.6, CITY * 2, oceanMat, -CITY - 38, 0.35, 0);
+  ocean.userData.baseX = ocean.position.x;
+  const crest = new THREE.Group();
+  const crestWall = box(5, 12, CITY * 2 + 40, new THREE.MeshLambertMaterial({ color: 0x2a7ec4, transparent: true, opacity: 0.8 }), 0, 6, 0, crest);
+  const crestFoam = box(5.5, 1.2, CITY * 2 + 40, new THREE.MeshBasicMaterial({ color: 0xeaf6ff, transparent: true, opacity: 0.9 }), 0, 12.4, 0, crest);
+  crest.visible = false;
+  group.add(crest);
+
+  // ---------- ocean spout (water column stretched toward the black hole) ----------
+  const spoutMat = new THREE.MeshLambertMaterial({ color: 0x6fb8e8, transparent: true, opacity: 0.35 });
+  const spout = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 6, 130, 12, 1, true), spoutMat);
+  spout.position.set(-CITY - 30, 60, 0);
+  spout.rotation.z = -0.3; // lean toward the black hole side
+  spout.visible = false;
+  group.add(spout);
 
   // ---------- glowing ground cracks ----------
   const cracks = [];
@@ -212,6 +220,59 @@ export function createWorld(scene) {
     c.userData = { v: new THREE.Vector3(), spin: new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)) };
     chunks.push(c);
   }
+
+  // ---------- the Moon (tidal foreshadowing: cracks, then shatters) ----------
+  const moon = new THREE.Group();
+  const moonSphere = new THREE.Mesh(new THREE.SphereGeometry(9, 24, 24), mat(0xbfc4cc));
+  moon.add(moonSphere);
+  const moonCracks = [];
+  for (let i = 0; i < 7; i++) {
+    const mc = new THREE.Mesh(
+      new THREE.BoxGeometry(rnd(1.5, 4), 0.4, rnd(3, 8)),
+      new THREE.MeshBasicMaterial({ color: 0xff7a30, transparent: true, opacity: 0 })
+    );
+    mc.position.set(rnd(-6, 6), rnd(-4, 7), rnd(-6, 6));
+    mc.rotation.y = rnd(0, Math.PI);
+    moon.add(mc); moonCracks.push(mc);
+  }
+  const moonChunks = [];
+  for (let i = 0; i < 10; i++) {
+    const s = rnd(2, 4.5);
+    const mc = box(s, s * rnd(0.6, 1), s * rnd(0.6, 1), mat(0x9aa0a8), 0, 0, 0, moon);
+    mc.visible = false;
+    mc.userData = { v: new THREE.Vector3(), spin: rnd(-0.8, 0.8) };
+    moonChunks.push(mc);
+  }
+  moon.position.set(-150, 100, -140);
+  group.add(moon);
+
+  // ---------- atmosphere stripping (wisps streaming to the black hole) ----------
+  const ATMO = 140;
+  const atmoMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.6, 0.6, 0.6),
+    new THREE.MeshLambertMaterial({ color: 0xcfe8ff, transparent: true, opacity: 0.55 }),
+    ATMO
+  );
+  atmoMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  atmoMesh.visible = false;
+  group.add(atmoMesh);
+  const atmo = Array.from({ length: ATMO }, () => ({
+    p: new THREE.Vector3(), v: new THREE.Vector3(), active: false,
+  }));
+
+  // ---------- magma eruptions (fountains from the fissures) ----------
+  const MAGMA = 90;
+  const magmaMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.45, 0.45, 0.45),
+    new THREE.MeshBasicMaterial({ color: 0xff6a20 }),
+    MAGMA
+  );
+  magmaMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  magmaMesh.visible = false;
+  group.add(magmaMesh);
+  const magma = Array.from({ length: MAGMA }, () => ({
+    p: new THREE.Vector3(), v: new THREE.Vector3(), life: 0,
+  }));
 
   // ---------- debris (for destruction) ----------
   const DEBRIS = 260;
@@ -261,8 +322,7 @@ export function createWorld(scene) {
         c.position.z += sp * dt;
         if (Math.abs(c.position.z) > CITY) c.position.z *= -0.98;
       }
-      // lift toward BH in late phases, spaghettifying as they rise
-      if (t > 0.55) {
+      if (t > 0.6) { // lift toward BH in late phases, spaghettifying as they rise
         const lift = Math.max(0, (t - 0.55) * 2.2) * Math.min(1, 30 / (c.position.distanceTo(bhPos) + 1));
         c.position.y = lift * 6;
         c.lookAt(bhPos);
@@ -280,7 +340,7 @@ export function createWorld(scene) {
       if (Math.random() < 0.005) p.userData.dir += rnd(-1, 1);
       p.position.x = THREE.MathUtils.clamp(p.position.x, -CITY + 4, CITY - 4);
       p.position.z = THREE.MathUtils.clamp(p.position.z, -CITY + 4, CITY - 4);
-      if (t > 0.45) { // people pulled off the ground, stretched into filaments
+      if (t > 0.55) { // people pulled off the ground, stretched into filaments
         const lift = Math.max(0, (t - 0.45) * 2) * Math.min(1, 25 / (p.position.distanceTo(bhPos) + 1));
         p.position.y = lift * 10;
         p.lookAt(bhPos);
@@ -303,24 +363,106 @@ export function createWorld(scene) {
       if (t > 0.6) tr.rotation.z += (t - 0.6) * 2 * Math.min(1, 20 / (tr.position.distanceTo(bhPos) + 1));
     }
 
-    // tidal waves: expanding water walls sweeping outward
-    for (const w of waves) {
-      const wt = THREE.MathUtils.smoothstep(t, w.t0, w.t0 + 0.22);
-      w.mesh.visible = wt > 0.001 && wt < 0.999;
-      if (w.mesh.visible) {
-        const r = 8 + wt * (CITY + 40);
-        w.mesh.scale.set(r, 1, r);
-        w.mesh.position.y = 2.5 + Math.sin(elapsed * 5 + w.t0 * 20) * 0.4;
-        w.mesh.rotation.y = elapsed * 0.5;
-        w.mesh.material.opacity = 0.2 + 0.5 * (1 - wt);
+    // coastal drawback: the ocean slides back, exposing the seabed
+    const drawback = THREE.MathUtils.smoothstep(t, 0.5, 0.58);
+    ocean.position.x = ocean.userData.baseX - drawback * 42;
+    oceanMat.opacity = 0.85 - drawback * 0.15;
+
+    // tsunami crest: one huge wall with a foam edge rolling across the city
+    const crestT = THREE.MathUtils.smoothstep(t, 0.58, 0.72);
+    crest.visible = crestT > 0.001 && crestT < 0.999;
+    if (crest.visible) {
+      crest.position.x = -CITY - 45 + crestT * (CITY * 2 + 55);
+      const grow = Math.sin(crestT * Math.PI);
+      crest.scale.y = 0.7 + grow * 1.1;
+      crest.rotation.z = -crestT * 0.3; // crest leans as it breaks
+      crestWall.material.opacity = 0.8 * (1 - crestT * 0.4);
+      crestFoam.material.opacity = 0.9 * (1 - crestT * 0.5);
+    }
+
+    // ocean spout: a water column stretched toward the black hole
+    const spoutT = THREE.MathUtils.smoothstep(t, 0.7, 0.78) * (1 - THREE.MathUtils.smoothstep(t, 0.92, 0.98));
+    spout.visible = spoutT > 0.01;
+    if (spout.visible) {
+      spout.scale.set(0.6 + spoutT * 0.8, 0.5 + spoutT * 0.7, 0.6 + spoutT * 0.8);
+      spout.rotation.y += dt * 2.5;
+      spoutMat.opacity = 0.2 + spoutT * 0.3 + Math.sin(elapsed * 6) * 0.05;
+    }
+
+    // the Moon: cracks glow, then it shatters and drifts apart
+    const moonCrackT = THREE.MathUtils.smoothstep(t, 0.18, 0.42);
+    const moonGone = t > 0.45;
+    moonSphere.visible = !moonGone;
+    moon.rotation.y += dt * 0.05;
+    for (const mc of moonCracks) mc.material.opacity = moonCrackT * (0.5 + 0.4 * Math.sin(elapsed * 3 + mc.position.x));
+    if (moonGone) {
+      for (const mc of moonChunks) {
+        if (!mc.visible) {
+          mc.visible = true;
+          mc.position.set(rnd(-8, 8), rnd(-8, 8), rnd(-8, 8));
+          mc.userData.v.set(mc.position.x * 0.12, mc.position.y * 0.12 + 1.5, mc.position.z * 0.12);
+        } else {
+          mc.userData.v.x += dt * 0.4; // slow drift toward the black hole side
+          mc.position.addScaledVector(mc.userData.v, dt);
+          mc.rotation.x += mc.userData.spin * dt;
+          mc.rotation.y += mc.userData.spin * 0.7 * dt;
+        }
       }
     }
 
-    // glowing ground cracks spread as the crust strains
+    // atmosphere stripping: wisps stream off the sky toward the black hole
+    const atmoT = THREE.MathUtils.smoothstep(t, 0.3, 0.45) * (1 - THREE.MathUtils.smoothstep(t, 0.78, 0.88));
+    atmoMesh.visible = atmoT > 0.01;
+    atmoMesh.material.opacity = 0.55 * atmoT;
+    if (atmoMesh.visible) {
+      for (let i = 0; i < ATMO; i++) {
+        const a = atmo[i];
+        if (!a.active) {
+          a.active = true;
+          a.p.set(rnd(-CITY, CITY), rnd(15, 55), rnd(-CITY, CITY));
+          a.v.subVectors(bhPos, a.p).normalize().multiplyScalar(rnd(8, 20));
+        }
+        a.p.addScaledVector(a.v, dt);
+        if (a.p.distanceTo(bhPos) < 12) a.active = false;
+        dummy.position.copy(a.p);
+        dummy.rotation.set(0, 0, 0);
+        dummy.updateMatrix();
+        atmoMesh.setMatrixAt(i, dummy.matrix);
+      }
+      atmoMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // magma eruptions from the fissures
+    const magmaT = THREE.MathUtils.smoothstep(t, 0.55, 0.65) * (1 - THREE.MathUtils.smoothstep(t, 0.92, 0.97));
+    magmaMesh.visible = magmaT > 0.01;
+    if (magmaMesh.visible) {
+      for (let i = 0; i < MAGMA; i++) {
+        const mg = magma[i];
+        mg.life -= dt;
+        if (mg.life <= 0) {
+          const src = cracks[Math.floor(Math.random() * cracks.length)];
+          mg.p.set(src.position.x, 0.2, src.position.z);
+          mg.v.set(rnd(-2, 2), rnd(7, 15), rnd(-2, 2));
+          mg.life = rnd(0.8, 1.6);
+        }
+        mg.v.y -= 12 * dt;
+        mg.p.addScaledVector(mg.v, dt);
+        dummy.position.copy(mg.p);
+        dummy.rotation.set(elapsed * 3, 0, 0);
+        dummy.updateMatrix();
+        magmaMesh.setMatrixAt(i, dummy.matrix);
+      }
+      magmaMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // glowing ground cracks spread, widen and heat up as the crust strains
     const crackT = THREE.MathUtils.smoothstep(t, 0.42, 0.85);
     for (const c of cracks) {
       c.visible = crackT > 0.01;
       c.material.opacity = crackT * (0.45 + 0.4 * Math.sin(elapsed * 4 + c.position.x * 0.7));
+      c.scale.x = 1 + crackT * 1.6; // fissures widen
+      const hot = 0.35 + 0.25 * Math.sin(elapsed * 4 + c.position.z);
+      c.material.color.setRGB(1, hot, 0.08);
     }
 
     // final fragmentation: slabs of earth tear free and spiral into the BH
@@ -344,6 +486,9 @@ export function createWorld(scene) {
       }
     } else for (const c of chunks) c.visible = false;
 
+    // ambient debris spawns: more matter tears free as the end nears
+    if (t > 0.6 && Math.random() < t * 0.3) spawnDebris({ x: rnd(-CITY, CITY), y: rnd(0, 6), z: rnd(-CITY, CITY) }, 1 + t);
+
     // building destruction: lean, sink, collapse
     const dest = THREE.MathUtils.smoothstep(t, 0.35, 0.95);
     state.destroyed = dest;
@@ -355,24 +500,33 @@ export function createWorld(scene) {
       if (k > 0.15 && Math.random() < 0.02 * k) spawnDebris(b.g.position, 1 + t);
     }
 
-    // debris physics: pulled toward BH
+    // debris physics: pulled toward BH, spiraling into streams late
+    const tang = new THREE.Vector3();
     let anyActive = false;
     for (let i = 0; i < DEBRIS; i++) {
       const d = debris[i];
-      if (!d.active) { dummy.position.set(0, -100, 0); }
+      if (!d.active) { dummy.position.set(0, -100, 0); dummy.scale.set(1, 1, 1); }
       else {
         anyActive = true;
         const dir = new THREE.Vector3().subVectors(bhPos, d.p).normalize();
         const pull = 6 + t * 40;
         d.v.addScaledVector(dir, pull * dt);
+        if (t > 0.6) { // spiral stream: swirl around the infall axis
+          tang.set(-dir.z, 0, dir.x).multiplyScalar(pull * 0.35);
+          d.v.addScaledVector(tang, dt);
+        }
         d.p.addScaledVector(d.v, dt);
         if (d.p.distanceTo(bhPos) < 4) d.active = false;
         dummy.position.copy(d.p);
         dummy.rotation.set(d.spin * elapsed, d.spin * elapsed * 0.7, 0);
+        const st = 1 + Math.min(5, d.v.length() * 0.12); // motion streak along velocity
+        dummy.scale.set(1, 1, st);
       }
       dummy.updateMatrix();
       debrisMesh.setMatrixAt(i, dummy.matrix);
     }
+    // embers: debris glows hotter as it feeds the disk
+    debrisMesh.material.color.setRGB(0.55 + t * 0.45, 0.48 - t * 0.13, 0.37 - t * 0.27);
     debrisMesh.visible = anyActive;
     debrisMesh.instanceMatrix.needsUpdate = true;
 
@@ -380,5 +534,5 @@ export function createWorld(scene) {
     state.shake = t > 0.25 ? (t - 0.25) * 0.5 : 0;
   }
 
-  return { group, buildings, cars, peds, waves, cracks, chunks, lights: { hemi, sun, amb, bhLight }, update, state, bhDir, spawnDebris };
+  return { group, buildings, cars, peds, ocean, crest, spout, moon, moonSphere, moonCracks, moonChunks, atmoMesh, magmaMesh, cracks, chunks, lights: { hemi, sun, amb, bhLight }, update, state, bhDir, spawnDebris };
 }

@@ -13,6 +13,7 @@ html, body { width: 100%; height: 100%; overflow: hidden; background: #000; font
 #hud-top { position: fixed; top: 12px; left: 16px; right: 16px; display: flex; justify-content: space-between; align-items: flex-start; z-index: 30; pointer-events: none; }
 #title-block h1 { color: #fff; font-size: 18px; letter-spacing: 2px; text-shadow: 0 2px 8px #000; }
 #phase-label { color: #ffd166; font-size: 13px; font-weight: 700; letter-spacing: 3px; margin-top: 4px; text-shadow: 0 1px 6px #000; }
+#sim-clock { color: #9fd6ff; font-size: 12px; font-weight: 700; letter-spacing: 2px; margin-top: 4px; text-shadow: 0 1px 6px #000; font-variant-numeric: tabular-nums; }
 #top-buttons { display: flex; gap: 8px; pointer-events: auto; }
 #top-buttons button { background: rgba(10,14,26,.8); color: #dfe8ff; border: 1px solid rgba(140,170,255,.35); border-radius: 6px; padding: 7px 12px; font-size: 12px; cursor: pointer; backdrop-filter: blur(4px); }
 #top-buttons button:hover { background: rgba(40,60,110,.9); }

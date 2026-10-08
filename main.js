@@ -7,6 +7,7 @@ import { createBlackHole } from './src/blackhole.js';
 const $ = (id) => document.getElementById(id);
 const viewport = $('viewport');
 const phaseLabel = $('phase-label');
+const simClock = $('sim-clock');
 const eduTitle = $('edu-title');
 const eduText = $('edu-text');
 const eduReal = $('edu-real');
@@ -59,24 +60,59 @@ bh.group.lookAt(0, 0, 0);
 // ---------- timeline engine ----------
 const MILESTONES = [
   { t: 0.00, label: 'NORMAL' },
-  { t: 0.14, label: '1 SEC' },
-  { t: 0.28, label: '10 SEC' },
-  { t: 0.46, label: '1 MIN' },
-  { t: 0.64, label: '1 HOUR' },
-  { t: 0.82, label: '1 DAY' },
-  { t: 1.00, label: 'FINAL' },
+  { t: 0.05, label: '1 SEC' },
+  { t: 0.10, label: '1 MIN' },
+  { t: 0.25, label: '1 HOUR' },
+  { t: 0.45, label: '1 DAY' },
+  { t: 0.70, label: '1 WEEK' },
+  { t: 0.85, label: '2 WEEKS' },
+  { t: 1.00, label: '3 WEEKS FINAL' },
 ];
 const PHASES = [
-  { until: 0.14, title: 'NORMAL', text: 'Everything is normal. Earth is in its usual gravitational environment.', real: 'With no black hole nearby, only Earth\u2019s own gravity acts on you.' },
-  { until: 0.28, title: '1 SEC', text: 'The black hole has appeared. The first visible effect is the distortion of light around it.', real: 'Lensing would be the first sign \u2014 light bending around the object.' },
-  { until: 0.46, title: '10 SEC', text: 'Lensing strengthens. The sky warps and distant objects shift position.', real: 'Gravitational lensing shifts apparent positions of background objects.' },
-  { until: 0.64, title: '1 MIN', text: 'Tidal forces grow. Objects respond to abnormal gravitational acceleration.', real: 'Tidal forces scale as 1/r\u00b3 \u2014 they grow brutally fast as distance shrinks.' },
-  { until: 0.82, title: '1 HOUR', text: 'Tidal waves sweep the streets. Buildings lean and debris streams skyward.', real: 'At this proximity, tidal disruption of the planet itself would begin.' },
-  { until: 1.01, title: '1 DAY / FINAL', text: 'The crust cracks with glowing fissures and slabs of Earth tear free, spiraling into the disk.', real: 'Matter spirals in, heats up, and crosses the event horizon \u2014 nothing escapes.' },
+  { until: 0.05, title: 'NORMAL', text: 'Everything is normal. Earth is in its usual gravitational environment.', real: 'With no black hole nearby, only Earth\u2019s own gravity acts on you.' },
+  { until: 0.10, title: '1 SEC', text: 'The black hole has appeared. The first visible effect is the distortion of light around it.', real: 'Lensing would be the first sign \u2014 light bending around the object.' },
+  { until: 0.25, title: '1 MIN', text: 'Lensing strengthens. Glowing cracks spread across the Moon\u2019s face.', real: 'Tidal forces scale as 1/r\u00b3 \u2014 the smaller, lighter Moon fails first.' },
+  { until: 0.45, title: '1 HOUR', text: 'The atmosphere itself begins to stream away toward the black hole.', real: 'Atmospheric stripping: gases escape when the BH\u2019s pull beats Earth\u2019s gravity.' },
+  { until: 0.70, title: '1 DAY', text: 'The Moon shatters. The ocean draws back from the coast, then a tsunami crest rolls in.', real: 'Tidal disruption of the planet begins; the ocean responds first.' },
+  { until: 0.85, title: '1 WEEK', text: 'Magma fountains from the fissures and a spout stretches the sea into the sky.', real: 'Matter spirals inward, heating up as it feeds the accretion disk.' },
+  { until: 1.01, title: '2-3 WEEKS / FINAL', text: 'Earth is a glowing spiral of debris feeding the disk. Nothing escapes.', real: 'Fragmentation \u2192 accretion: the planet\u2019s mass joins the disk and horizon.' },
 ];
 function phaseFor(t) {
   for (const p of PHASES) if (t < p.until) return p;
   return PHASES[PHASES.length - 1];
+}
+
+// ---------- simulated clock: timeline position -> real elapsed time ----------
+const CLOCK_STOPS = [
+  [0.00, 0],           // T+0
+  [0.05, 1],           // 1 sec
+  [0.10, 60],          // 1 min
+  [0.25, 3600],        // 1 hour
+  [0.45, 86400],       // 1 day
+  [0.70, 604800],      // 1 week
+  [1.00, 1814400],     // 3 weeks
+];
+function simSeconds(t) {
+  for (let i = 1; i < CLOCK_STOPS.length; i++) {
+    if (t <= CLOCK_STOPS[i][0]) {
+      const t0 = CLOCK_STOPS[i - 1][0], s0 = CLOCK_STOPS[i - 1][1];
+      const t1 = CLOCK_STOPS[i][0], s1 = CLOCK_STOPS[i][1];
+      return s0 + (s1 - s0) * ((t - t0) / (t1 - t0));
+    }
+  }
+  return CLOCK_STOPS[CLOCK_STOPS.length - 1][1];
+}
+function formatClock(s) {
+  const w = Math.floor(s / 604800); s -= w * 604800;
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60); s -= m * 60;
+  const p2 = (n) => String(n).padStart(2, '0');
+  let out = '';
+  if (w) out += w + 'w ';
+  if (d) out += d + 'd ';
+  out += p2(h) + ':' + p2(m) + ':' + p2(Math.floor(s));
+  return 'T+ ' + out;
 }
 
 let simTime = 0;
@@ -86,6 +122,7 @@ let orbitView = false;
 let paused = false;
 let elapsed = 0;
 let dtLast = 0.016;
+let speedMult = 1;
 
 function setSimTime(t) {
   simTime = THREE.MathUtils.clamp(t, 0, 1);
@@ -112,6 +149,7 @@ function setSimTime(t) {
   eduTitle.textContent = ph.title;
   eduText.textContent = ph.text;
   eduReal.textContent = 'Physically: ' + ph.real;
+  simClock.textContent = formatClock(simSeconds(simTime));
   let active = MILESTONES[0];
   for (const m of MILESTONES) if (simTime >= m.t - 0.001) active = m;
   labelsRow.querySelectorAll('span').forEach((el, i) => el.classList.toggle('active', MILESTONES[i] === active));
@@ -149,6 +187,12 @@ btnOrbit.addEventListener('click', () => {
   if (orbitView) controls.unlock();
 });
 btnControls.addEventListener('click', () => controlsPanel.classList.toggle('hidden'));
+const btnSpeed = $('btn-speed');
+const SPEEDS = [1, 60, 3600];
+btnSpeed.addEventListener('click', () => {
+  speedMult = SPEEDS[(SPEEDS.indexOf(speedMult) + 1) % SPEEDS.length];
+  btnSpeed.textContent = '\u23E9 SPEED \u00D7' + speedMult;
+});
 
 // ---------- first-person controls ----------
 const controls = new PointerLockControls(camera, renderer.domElement);
@@ -289,7 +333,7 @@ function animate() {
     dtLast = dt;
     if (!cinematic && !orbitView) movePlayer(dt);
     updateCinematic(dt);
-    if (!cinematic && playing) setSimTime(simTime + dt * 0.008);
+    if (!cinematic && playing) setSimTime(simTime + dt * 0.008 * speedMult);
     if (orbitView) {
       const a = elapsed * 0.08;
       camera.position.set(Math.cos(a) * 300, 160, Math.sin(a) * 300);
@@ -314,3 +358,6 @@ setSimTime(0);
 animate();
 loading.classList.add('done');
 setTimeout(() => loading.remove(), 700);
+
+// exported for headless tests (no effect in the browser)
+export { simSeconds, formatClock, phaseFor };
